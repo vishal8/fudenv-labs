@@ -1,0 +1,19 @@
+/* PASTE THIS FILE AS-IS */
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #ffffff;
+  color: #0a0a0a;
+}
