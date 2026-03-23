@@ -116,8 +116,10 @@ function kCombinations<T>(arr: T[], k: number): T[][] {
       out.push([...path]);
       return;
     }
+
     for (let i = start; i < arr.length; i++) {
-      path.push(arr[i]);
+      const item = arr[i] as T;
+      path.push(item);
       helper(i + 1, path);
       path.pop();
     }
@@ -276,8 +278,13 @@ function evaluateAssignment(args: {
   const rows: ScenarioRow[] = CATEGORIES.map((category) => {
     const cardName = assignment[category];
     const card = selected[cardName];
+
+    if (!card) {
+      throw new Error(`Card not found for assignment: ${cardName}`);
+    }
+
     const result = valueForSpend({
-      card,
+      card: card!,
       category,
       spend: spend[category],
       cppByProgram,
@@ -776,12 +783,16 @@ export default function CardOptimizerPage() {
       return;
     }
 
-    if (!comparatorChoices.includes(cardA)) {
-      setCardA(comparatorChoices[0]);
+    const firstCard = comparatorChoices[0];
+    const secondCard =
+      comparatorChoices.length > 1 ? comparatorChoices[1] : comparatorChoices[0];
+
+    if (firstCard && !comparatorChoices.includes(cardA)) {
+      setCardA(firstCard);
     }
 
-    if (!comparatorChoices.includes(cardB)) {
-      setCardB(comparatorChoices[Math.min(1, comparatorChoices.length - 1)]);
+    if (secondCard && !comparatorChoices.includes(cardB)) {
+      setCardB(secondCard);
     }
   }, [comparatorChoices, cardA, cardB]);
 
