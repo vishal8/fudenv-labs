@@ -90,6 +90,22 @@ const EMPTY_SPEND: SpendState = {
   other: 0,
 };
 
+// const DEFAULT_SELECTED = [
+//   "Bilt Obsidian",
+//   "Venture X",
+//   "Amex Gold",
+//   "Chase Sapphire Preferred",
+//   "Amazon Prime Visa",
+// ];
+
+// const DEFAULT_SPEND: SpendState = {
+//   dining: 5000,
+//   groceries: 5000,
+//   flights: 5000,
+//   hotels: 5000,
+//   other: 5000,
+// };
+
 function fmtMoney(n: number): string {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
@@ -599,12 +615,15 @@ function buildSingleCardScenario(args: {
 
 function Table(props: { columns: string[]; rows: Array<Record<string, ReactNode>> }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-950">
-      <table className="min-w-full text-sm">
-        <thead className="bg-zinc-900">
+    <div className="w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+      <table className="w-full text-sm">
+        <thead className="bg-zinc-50">
           <tr>
             {props.columns.map((col) => (
-              <th key={col} className="border-b border-zinc-800 px-4 py-3 text-left font-medium text-zinc-300">
+              <th
+                key={col}
+                className="border-b border-zinc-200 px-4 py-3 text-left font-medium text-zinc-500"
+              >
                 {col}
               </th>
             ))}
@@ -612,9 +631,9 @@ function Table(props: { columns: string[]; rows: Array<Record<string, ReactNode>
         </thead>
         <tbody>
           {props.rows.map((row, idx) => (
-            <tr key={idx} className="border-b border-zinc-900">
+            <tr key={idx} className="border-b border-zinc-100 last:border-b-0">
               {props.columns.map((col) => (
-                <td key={col} className="px-4 py-3 align-top text-zinc-100">
+                <td key={col} className="px-4 py-3 align-top text-zinc-900">
                   {row[col]}
                 </td>
               ))}
@@ -859,29 +878,62 @@ export default function CardOptimizerPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-7xl px-6 py-10">
+    <main className="min-h-screen bg-white text-zinc-900">
+      <div className="mx-auto max-w-[1400px] px-6 py-10">
         <div className="mb-8">
           <h1 className="text-5xl font-semibold tracking-tight">Card Optimizer</h1>
-          <p className="mt-3 max-w-4xl text-lg text-zinc-400">
-            Optimize across cards, compare single-card outcomes, and model Bilt rent value with Option A vs Option B.
-          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a
+              href="/products"
+              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm hover:bg-zinc-100"
+            >
+              ← Back to Products
+            </a>
+
+            <a
+              href="https://github.com/vishal8/card-optimizer"
+              target="_blank"
+              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm hover:bg-zinc-100"
+            >
+              View Code
+            </a>
+
+            <a
+              href="mailto:your@email.com"
+              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm hover:bg-zinc-100"
+            >
+              Share Feedback
+            </a>
+          </div>
+            <p className="mt-3 max-w-4xl text-lg text-zinc-500">
+              Optimize across cards, compare single-card outcomes, and model Bilt rent value with Option A vs Option B.
+            </p>
+
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 text-sm">
+              <div className="mb-2 font-medium text-zinc-900">What this tool does</div>
+              <ul className="list-disc space-y-1 pl-5 text-zinc-600">
+                <li>Optimizes category spend across multiple credit cards</li>
+                <li>Models Bilt rent value using multiple reward structures</li>
+                <li>Compares single-card vs multi-card strategies</li>
+                <li>Outputs best setup based on your assumptions</li>
+              </ul>
+            </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-          <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="grid gap-6 lg:grid-cols-[290px_minmax(0,1fr)]">
+          <section className="rounded-3xl border border-zinc-200 bg-white p-5">
             <h2 className="text-xl font-semibold">Inputs</h2>
 
             <div className="mt-5 space-y-5">
               <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-300">Cards to include</label>
+                <label className="mb-2 block text-sm font-medium text-zinc-700">Cards to include</label>
                 <div className="grid gap-2">
                   {CARDS.map((card) => {
                     const checked = draftSelectedNames.includes(card.name);
                     return (
                       <label
                         key={card.name}
-                        className="flex items-center justify-between rounded-2xl border border-zinc-800 px-3 py-2 hover:bg-zinc-900"
+                        className="flex items-center justify-between rounded-2xl border border-zinc-200 px-3 py-2 hover:bg-zinc-50"
                       >
                         <span className="text-sm">{card.name}</span>
                         <input
@@ -901,14 +953,14 @@ export default function CardOptimizerPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 p-4">
+              <div className="rounded-2xl border border-zinc-200 p-4">
                 <h3 className="mb-3 font-medium">Annual spend</h3>
                 <div className="grid gap-3">
                   {CATEGORIES.map((cat) => (
                     <label key={cat} className="grid gap-1">
-                      <span className="text-sm capitalize text-zinc-400">{cat}</span>
+                      <span className="text-sm capitalize text-zinc-500">{cat}</span>
                       <input
-                        className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+                        className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none focus:border-zinc-400"
                         type="number"
                         value={draftSpend[cat]}
                         onChange={(e) =>
@@ -918,9 +970,9 @@ export default function CardOptimizerPage() {
                     </label>
                   ))}
                   <label className="grid gap-1">
-                    <span className="text-sm text-zinc-400">Rent</span>
+                    <span className="text-sm text-zinc-500">Rent</span>
                     <input
-                      className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+                      className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none focus:border-zinc-400"
                       type="number"
                       value={draftRent}
                       onChange={(e) => setDraftRent(Number(e.target.value) || 0)}
@@ -929,11 +981,11 @@ export default function CardOptimizerPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 p-4">
+              <div className="rounded-2xl border border-zinc-200 p-4">
                 <h3 className="mb-3 font-medium">Amazon assumptions</h3>
                 <div className="grid gap-4">
                   <label className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-zinc-300">I have Amazon Prime</span>
+                    <span className="text-sm text-zinc-700">I have Amazon Prime</span>
                     <input
                       type="checkbox"
                       checked={draftHasPrime}
@@ -942,7 +994,7 @@ export default function CardOptimizerPage() {
                   </label>
 
                   <label className="grid gap-1">
-                    <span className="text-sm text-zinc-400">Share of grocery spend at Whole Foods / Amazon</span>
+                    <span className="text-sm text-zinc-500">Share of grocery spend at Whole Foods / Amazon</span>
                     <input
                       type="range"
                       min={0}
@@ -955,7 +1007,7 @@ export default function CardOptimizerPage() {
                   </label>
 
                   <label className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-zinc-300">Book travel through portal when required</span>
+                    <span className="text-sm text-zinc-700">Book travel through portal when required</span>
                     <input
                       type="checkbox"
                       checked={draftUseTravelPortal}
@@ -965,7 +1017,7 @@ export default function CardOptimizerPage() {
                 </div>
               </div>
 
-            <div className="rounded-2xl border border-zinc-800 p-4">
+            <div className="rounded-2xl border border-zinc-200 p-4">
             <h3 className="mb-3 font-medium">Valuations (cpp)</h3>
             <div className="grid gap-3">
                 {[
@@ -976,9 +1028,9 @@ export default function CardOptimizerPage() {
                 ["Citi TY", draftCitiCpp, setDraftCitiCpp],
                 ].map(([label, value, setter]) => (
                 <label key={label as string} className="grid gap-1 min-w-0">
-                    <span className="text-sm text-zinc-400">{label as string}</span>
+                    <span className="text-sm text-zinc-500">{label as string}</span>
                     <input
-                    className="w-full min-w-0 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+                    className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none"
                     type="number"
                     step="0.05"
                     value={value as number}
@@ -989,13 +1041,13 @@ export default function CardOptimizerPage() {
             </div>
             </div>
 
-              <div className="rounded-2xl border border-zinc-800 p-4">
+              <div className="rounded-2xl border border-zinc-200 p-4">
                 <h3 className="mb-3 font-medium">Optimizer</h3>
                 <div className="grid gap-3">
                   <label className="grid gap-1">
-                    <span className="text-sm text-zinc-400">Max cards allowed</span>
+                    <span className="text-sm text-zinc-500">Max cards allowed</span>
                     <input
-                      className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+                      className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none focus:border-zinc-400"
                       type="number"
                       min={1}
                       max={6}
@@ -1007,9 +1059,9 @@ export default function CardOptimizerPage() {
                   </label>
 
                   <label className="grid gap-1">
-                    <span className="text-sm text-zinc-400">Bilt rent mode</span>
+                    <span className="text-sm text-zinc-500">Bilt rent mode</span>
                     <select
-                      className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+                      className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none focus:border-zinc-400"
                       value={draftRentMode}
                       onChange={(e) => setDraftRentMode(e.target.value as RentMode)}
                     >
@@ -1021,9 +1073,9 @@ export default function CardOptimizerPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-zinc-800 p-4">
+              <div className="rounded-2xl border border-zinc-200 p-4">
                 <h3 className="mb-3 font-medium">Bilt assumptions</h3>
-                <div className="space-y-2 text-sm text-zinc-400">
+                <div className="space-y-2 text-sm text-zinc-500">
                   <div>Option A tiers: 25% → 0.50×, 50% → 0.75×, 75% → 1.00×, 100% → 1.25×</div>
                   <div>Option B: 4% rent cap, 3% unlock rate</div>
                   <div className="text-zinc-500">Shown for transparency only.</div>
@@ -1034,14 +1086,14 @@ export default function CardOptimizerPage() {
                 <button
                   type="button"
                   onClick={applyChanges}
-                  className="rounded-xl bg-white px-4 py-3 font-medium text-black transition hover:bg-zinc-200"
+                  className="rounded-xl border border-zinc-900 bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-800"
                 >
                   Apply
                 </button>
                 <button
                   type="button"
                   onClick={clearAll}
-                  className="rounded-xl border border-zinc-700 px-4 py-3 font-medium text-white transition hover:bg-zinc-900"
+                  className="rounded-xl border border-zinc-900 bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-800"
                 >
                   Clear
                 </button>
@@ -1051,26 +1103,26 @@ export default function CardOptimizerPage() {
 
 <section className="space-y-6">
   {!best ? (
-    <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-8 text-zinc-400">
+    <div className="rounded-3xl border border-zinc-200 bg-white p-8 text-zinc-500">
       Select cards, enter inputs, then click Apply.
     </div>
   ) : (
     <>
       {bestCore && (
-        <div className="rounded-3xl border border-blue-900 bg-blue-950/30 p-5">
-          <div className="text-sm uppercase tracking-wide text-blue-300">Core spend only</div>
+        <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-soft">
+          <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">Core spend only</div>
           <div className="mt-2 text-lg font-medium">
             Best core-spend combo: {bestCore.usedCards.join(", ")} — {fmtMoney(bestCore.coreValue)}/yr
           </div>
         </div>
       )}
 
-      <div className="rounded-3xl border border-emerald-900 bg-emerald-950/30 p-5">
-        <div className="text-sm uppercase tracking-wide text-emerald-300">Optimizer result</div>
+      <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-soft">
+        <div className="text-sm font-medium uppercase tracking-wide text-zinc-500">Optimizer result</div>
         <div className="mt-2 text-2xl font-semibold">
           Best combo: {best.usedCards.join(", ")} — {fmtMoney(best.totalValue)}/yr
         </div>
-        <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-400">
+        <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
           Net annual value = value from category spend + modeled Bilt rent value − annual fees.
           Point cards are converted to dollars using your cpp assumptions. Cashback cards are treated as direct dollar value.
         </div>
@@ -1130,38 +1182,38 @@ export default function CardOptimizerPage() {
           />
         </div>
 
-        <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="mt-6 rounded-3xl border border-zinc-200 bg-white p-6 shadow-soft">
           <h3 className="text-lg font-semibold">Best allocation</h3>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="mt-2 text-sm text-zinc-500">
             This shows which selected card is assigned to each spend category in the current best net-value setup.
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-2xl bg-black p-4 text-sm text-zinc-300">
+          <pre className="mt-4 overflow-x-auto rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-700">
             {JSON.stringify(best.assignment, null, 2)}
           </pre>
 
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-zinc-400">Spend value (non-rent)</span>
+              <span className="text-zinc-500">Spend value (non-rent)</span>
               <span>{fmtMoney(best.coreValue)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-zinc-400">Modeled rent value</span>
+              <span className="text-zinc-500">Modeled rent value</span>
               <span>
                 {fmtMoney(best.rentValue)} {best.rentModeUsed !== "—" ? `(${best.rentModeUsed})` : ""}
               </span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-zinc-400">Annual fees</span>
+              <span className="text-zinc-500">Annual fees</span>
               <span>{best.fees > 0 ? `-${fmtMoney(best.fees)}` : fmtMoney(0)}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 border-t border-zinc-800 pt-3 text-lg font-semibold">
+            <div className="flex items-center justify-between gap-4 border-t border-zinc-200 pt-3 text-lg font-semibold">
               <span>Net annual value</span>
               <span>{fmtMoney(best.totalValue)}</span>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-zinc-800 bg-black/50 p-4 text-sm text-zinc-400">
+          <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
             {best.rentExplain}
           </div>
 
@@ -1173,10 +1225,10 @@ export default function CardOptimizerPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
+      <div className="rounded-3xl border border-zinc-200 bg-white p-5">
         <div className="mb-4">
           <h2 className="text-2xl font-semibold">Top contenders</h2>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="mt-2 text-sm text-zinc-500">
             These are the best distinct card combinations ranked by net annual value.
             Each row shows the best assignment found for that specific set of cards.
           </p>
@@ -1205,15 +1257,18 @@ export default function CardOptimizerPage() {
           }))}
         />
       </div>
-
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-5">
+    </>
+  )}
+</section>
+        </div>
+        <div className="rounded-3xl border border-zinc-200 bg-white p-5">
         <h2 className="mb-4 text-2xl font-semibold">Comparator</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-2">
-            <span className="text-sm text-zinc-400">Card A</span>
+            <span className="text-sm text-zinc-500">Card A</span>
             <select
-              className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+              className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none focus:border-zinc-400"
               value={cardA}
               onChange={(e) => setCardA(e.target.value)}
             >
@@ -1226,9 +1281,9 @@ export default function CardOptimizerPage() {
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm text-zinc-400">Card B</span>
+            <span className="text-sm text-zinc-500">Card B</span>
             <select
-              className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+              className="w-full min-w-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 outline-none focus:border-zinc-400"
               value={cardB}
               onChange={(e) => setCardB(e.target.value)}
             >
@@ -1243,8 +1298,8 @@ export default function CardOptimizerPage() {
 
         {scenarioA && scenarioB && (
           <>
-            <div className="mt-6 grid gap-6 xl:grid-cols-2">
-              <div className="space-y-3">
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <div className="min-w-0 space-y-3 rounded-3xl border border-zinc-200 bg-white p-5 shadow-soft">
                 <h3 className="text-lg font-medium">A — {cardA}</h3>
                 <Table
                   columns={["Category", "Spend", "Rate", "Earned", "Value ($)"]}
@@ -1293,12 +1348,12 @@ export default function CardOptimizerPage() {
                     },
                   ]}
                 />
-                <div className="rounded-2xl border border-zinc-800 bg-black/50 p-4 text-sm text-zinc-400">
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
                   {scenarioA.explain}
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="min-w-0 space-y-3 rounded-3xl border border-zinc-200 bg-white p-5 shadow-soft">
                 <h3 className="text-lg font-medium">B — {cardB}</h3>
                 <Table
                   columns={["Category", "Spend", "Rate", "Earned", "Value ($)"]}
@@ -1347,13 +1402,13 @@ export default function CardOptimizerPage() {
                     },
                   ]}
                 />
-                <div className="rounded-2xl border border-zinc-800 bg-black/50 p-4 text-sm text-zinc-400">
+                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
                   {scenarioB.explain}
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-zinc-800 bg-black/50 p-4 text-lg font-medium">
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-lg font-medium text-zinc-900">
               {Math.abs(scenarioB.net - scenarioA.net) < 1e-9
                 ? "Tie: both cards have the same net annual value."
                 : `Winner: ${scenarioB.net > scenarioA.net ? cardB : cardA} by ${fmtMoney(
@@ -1363,10 +1418,6 @@ export default function CardOptimizerPage() {
           </>
         )}
       </div>
-    </>
-  )}
-</section>
-        </div>
       </div>
     </main>
   );
