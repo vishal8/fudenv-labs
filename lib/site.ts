@@ -4,7 +4,8 @@ export type ProductKey =
   | "unsold-marketplace"
   | "mmm-analytics"
   | "influencer-fit"
-  | "credit-card-optimizer";
+  | "credit-card-optimizer"
+  |"trader-tax-engine";
 
 export type Product = {
   key: ProductKey;
@@ -32,6 +33,19 @@ export const site = {
 };
 
 export const products: Product[] = [
+  {
+    key: "credit-card-optimizer",
+    name: "Credit Card Optimizer",
+    tagline: "Decision engine to maximize rewards across complex card ecosystems.",
+    href: "/products/credit-card-optimizer",
+    status: "Live",
+    bullets: [
+      "Optimization logic for multi-card setups and categories.",
+      "Configurable assumptions (value per point, caps, multipliers).",
+      "Outputs as clear recommendations and comparisons."
+    ],
+    stack: ["Next.js", "TypeScript", "Math/Optimization", "CSV/JSON inputs"]
+  },
   {
     key: "unsold-marketplace",
     name: "Unsold Inventory Marketplace",
@@ -72,17 +86,17 @@ export const products: Product[] = [
     stack: ["Next.js", "TypeScript", "Python", "SQL"]
   },
   {
-    key: "credit-card-optimizer",
-    name: "Credit Card Optimizer",
-    tagline: "Decision engine to maximize rewards across complex card ecosystems.",
-    href: "/products/credit-card-optimizer",
-    status: "Live",
+    key: "trader-tax-engine",
+    name: "Tax & Wash Sale Engine",
+    tagline: "Track wash sales across accounts and estimate quarterly taxes for active trading activity.",
+    href: "/products/trader-tax-engine",
+    status: "In progress",
     bullets: [
-      "Optimization logic for multi-card setups and categories.",
-      "Configurable assumptions (value per point, caps, multipliers).",
-      "Outputs as clear recommendations and comparisons."
+      "Wash sale detection across multiple brokerage accounts and overlapping positions.",
+      "Estimated quarterly tax planning based on realized gains, losses, and trading activity.",
+      "Built to reduce surprises and make active trader tax tracking more usable year round."
     ],
-    stack: ["Next.js", "TypeScript", "Math/Optimization", "CSV/JSON inputs"]
+    stack: ["Python", "Tax logic", "Trading data", "Multi-account reconciliation", "Forecasting"]
   }
 ];
 
