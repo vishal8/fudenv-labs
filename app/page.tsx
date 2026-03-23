@@ -13,7 +13,7 @@ export default function HomePage() {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
           {site.tagline}
         </h1>
-        <p className="mt-4 max-w-2xl text-base text-zinc-700">
+        <p className="mt-4 max-w-2xl text-base text-zinc-700 whitespace-pre-line">
           {site.ownerLine}
         </p>
 
@@ -46,20 +46,24 @@ export default function HomePage() {
         </div>
       </Section>
 
-      <Section title="How I work" kicker="Principles">
-        <div className="grid gap-4 sm:grid-cols-3">
+      <Section title="Curiosity" kicker="Why this exists">
+        <div className="grid gap-4 sm:grid-cols-4">
           {[
             {
-              title: "Start with the user",
-              body: "Define the job-to-be-done and narrow to an MVP that can ship."
+              title: "Everyday Problems",
+              body: "A lot of what shows up here starts with something small that feels inefficient, messy, or just worth rethinking."
             },
             {
-              title: "Instrument everything",
-              body: "Make metrics part of the product—so iteration is obvious."
+              title: "Analytical by instinct",
+              body: "I like breaking problems into parts, thinking through tradeoffs, and building something concrete instead of guessing."
             },
             {
-              title: "Ship, learn, repeat",
-              body: "Tight loops: build → test → refine → launch."
+              title: "Ideas in motion",
+              body: "Some of these projects are practical. Some are oddly specific. Some begin as random thoughts and turn into full builds."
+            },
+            {
+              title: "Open to feedback",
+              body: "Most of this is iterative. If you see a better way to approach something, I’m always open to ideas, feedback, and learning from other people."
             }
           ].map((item) => (
             <div

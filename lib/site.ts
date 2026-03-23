@@ -19,12 +19,15 @@ export type Product = {
 export const site = {
   name: "Fudenv Labs",
   domain: "fudenv.com",
-  tagline: "A product studio building data-driven tools across marketplaces, analytics, and decision optimization.",
-  ownerLine: "I design, build, and ship products from discovery to MVP—combining product strategy, analytics, and engineering.",
-  email: "hello@fudenv.com",
+  tagline: "A home for ideas I can’t stop thinking about.",
+  ownerLine: `I use Fudenv Labs to turn everyday problems, odd questions, and random ideas into real tools, experiments, and working products.
+  
+  Some are practical. Some are niche. Some start as passing thoughts and become full builds.`,
+  
+  email: "vishaljain8190@gmail.com",
   links: {
-    linkedin: "https://www.linkedin.com/",
-    github: "https://github.com/"
+    linkedin: "https://www.linkedin.com/in/vishaljain8190",
+    github: "https://github.com/vishal8"
   }
 };
 
@@ -73,7 +76,7 @@ export const products: Product[] = [
     name: "Credit Card Optimizer",
     tagline: "Decision engine to maximize rewards across complex card ecosystems.",
     href: "/products/credit-card-optimizer",
-    status: "Prototype",
+    status: "Live",
     bullets: [
       "Optimization logic for multi-card setups and categories.",
       "Configurable assumptions (value per point, caps, multipliers).",
