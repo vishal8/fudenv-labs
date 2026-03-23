@@ -1,5 +1,5 @@
 {
+  "/products/credit-card-optimizer/page": "app/products/credit-card-optimizer/page.js",
   "/page": "app/page.js",
-  "/products/page": "app/products/page.js",
-  "/products/unsold-marketplace/page": "app/products/unsold-marketplace/page.js"
+  "/products/page": "app/products/page.js"
 }

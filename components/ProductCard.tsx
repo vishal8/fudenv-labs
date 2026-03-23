@@ -42,7 +42,7 @@ export function ProductCard({ product }: { product: Product }) {
       </div>
 
       <div className="mt-6 text-sm font-medium text-zinc-900">
-        View product <span className="transition group-hover:translate-x-0.5">→</span>
+        Open tool → <span className="transition group-hover:translate-x-0.5">→</span>
       </div>
     </Link>
   );
