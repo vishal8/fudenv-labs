@@ -15,7 +15,21 @@ import {
 
 type Category = "dining" | "groceries" | "flights" | "hotels" | "other";
 type Program = "cash_back" | "bilt" | "capital_one" | "amex_mr" | "chase_ur" | "citi_ty";
-type RentMode = "auto" | "option_a" | "option_b";
+type RentMode = "option_a" | "option_b";
+type BenefitSettings = { period: string; legacyCycles: number; obsidianValue: number; palladiumValue: number; legacyObsidianValue: number; legacyPalladiumValue: number };
+const DEFAULT_BENEFITS: BenefitSettings = { period: "refreshed", legacyCycles: 6, obsidianValue: 0, palladiumValue: 0, legacyObsidianValue: 0, legacyPalladiumValue: 0 };
+
+function benefitValues(settings: BenefitSettings, mode: RentMode, annualA: number, annualB: number, names: string[]) {
+  const legacyCycles = settings.period === "transition" ? settings.legacyCycles : settings.period === "legacy" ? 12 : 0;
+  const selectedMode = settings.period === "legacy" ? "option_b" : mode;
+  const housing = (selectedMode === "option_b" ? annualB : annualA) * legacyCycles / 12 + annualA * (12 - legacyCycles) / 12;
+  const credit = names.reduce((total, name) => {
+    const refreshed = name === "Bilt Obsidian" ? settings.obsidianValue : name === "Bilt Palladium" ? settings.palladiumValue : 0;
+    const legacy = name === "Bilt Obsidian" ? settings.legacyObsidianValue : name === "Bilt Palladium" ? settings.legacyPalladiumValue : 0;
+    return total + (settings.period === "transition" ? refreshed + legacy : settings.period === "legacy" ? legacy : refreshed);
+  }, 0);
+  return { housing, credit, label: legacyCycles === 0 ? "Housing-only" : legacyCycles === 12 ? selectedMode === "option_b" ? "Flexible" : "Housing-only" : `${legacyCycles} cycles ${selectedMode === "option_b" ? "Flexible" : "Housing-only"}, ${12 - legacyCycles} Housing-only` };
+}
 type TabKey = "optimizer" | "bilt";
 
 type Card = {
@@ -41,6 +55,7 @@ type Scenario = {
   assignment: Record<Category, string>;
   usedCards: string[];
   coreValue: number;
+  creditValue: number;
   rentValue: number;
   fees: number;
   totalValue: number;
@@ -51,6 +66,7 @@ type Scenario = {
 };
 
 type SingleCardScenario = {
+  creditValue: number;
   rows: Array<{
     category: string;
     spend: string;
@@ -101,7 +117,6 @@ const EMPTY_SPEND: SpendState = {
   hotels: 0,
   other: 0,
 };
-
 const BILT_TIER_25 = 0.5;
 const BILT_TIER_50 = 0.75;
 const BILT_TIER_75 = 1.0;
@@ -109,30 +124,12 @@ const BILT_TIER_100 = 1.25;
 const BILT_CASH_RATE = 0.04;
 const BILT_UNLOCK_RATE = 0.03;
 
-// const DEFAULT_SELECTED = [
-//   "Bilt Obsidian",
-//   "Venture X",
-//   "Amex Gold",
-//   "Chase Sapphire Preferred",
-//   "Amazon Prime Visa",
-// ];
-
-// const DEFAULT_SPEND: SpendState = {
-//   dining: 5000,
-//   groceries: 5000,
-//   flights: 5000,
-//   hotels: 5000,
-//   other: 5000,
-// };
-
 function fmtMoney(n: number): string {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
-
 function fmtPoints(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
-
 function safePct(n: number): string {
   return `${n.toFixed(2)}%`;
 }
@@ -155,10 +152,8 @@ function kCombinations<T>(arr: T[], k: number): T[][] {
       out.push([...path]);
       return;
     }
-
-    for (let i = start; i < arr.length; i++) {
-      const item = arr[i] as T;
-      path.push(item);
+    for (let i = start; i < arr.length; i += 1) {
+      path.push(arr[i]!);
       helper(i + 1, path);
       path.pop();
     }
@@ -168,30 +163,10 @@ function kCombinations<T>(arr: T[], k: number): T[][] {
   return out;
 }
 
-function optionAPoints(rent: number, nonRentSpendOnBilt: number): number {
-  const ratio = rent > 0 ? nonRentSpendOnBilt / rent : 0;
-  let tier = 0;
-
-  if (ratio >= 1.0) tier = 1.25;
-  else if (ratio >= 0.75) tier = 1.0;
-  else if (ratio >= 0.5) tier = 0.75;
-  else if (ratio >= 0.25) tier = 0.5;
-  else tier = 0;
-
-  const rawPoints = rent * tier;
-  return Math.max(250, rawPoints);
-}
-
-function optionBPoints(rent: number, nonRentSpendOnBilt: number): number {
-  const biltCash = nonRentSpendOnBilt * 0.04;
-  const unlockedPoints = biltCash / 0.03;
-  return Math.min(rent, unlockedPoints);
-}
-
 function biltRentValue(args: {
   rent: number;
   nonRentSpendOnBilt: number;
-  biltCpp: number;
+  biltCpp: number; // already in dollars per point, e.g. 1.0 cpp => 0.01
   mode: Exclude<RentMode, "auto">;
   tier25: number;
   tier50: number;
@@ -200,12 +175,17 @@ function biltRentValue(args: {
   biltCashRate: number;
   unlockRate: number;
 }): { value: number; explain: string } {
-  const { rent, nonRentSpendOnBilt, biltCpp, mode } = args;
+  const {
+    rent,
+    nonRentSpendOnBilt,
+    biltCpp,
+    mode,
+  } = args;
 
   if (rent <= 0) return { value: 0, explain: "No rent." };
 
   if (mode === "option_a") {
-    const points = optionAPoints(rent, nonRentSpendOnBilt);
+    const points = 12 * optionAPoints(rent / 12, nonRentSpendOnBilt / 12);
     const ratio = rent > 0 ? nonRentSpendOnBilt / rent : 0;
 
     let tierLabel = "<25%";
@@ -218,7 +198,7 @@ function biltRentValue(args: {
 
     return {
       value,
-      explain: `Option A: ${fmtPoints(points)} rent points from tier ${tierLabel}, valued at ${fmtMoney(value)}`,
+      explain: `Option A: ${fmtPoints(points)} rent points from tier ${tierLabel}, valued at ${fmtMoney(value)}`
     };
   }
 
@@ -227,10 +207,30 @@ function biltRentValue(args: {
 
   return {
     value,
-    explain: `Option B: ${fmtPoints(points)} rent points unlocked from Bilt Cash conversion, valued at ${fmtMoney(value)}`,
+    explain: `Option B: ${fmtPoints(points)} rent points unlocked from Bilt Cash conversion, valued at ${fmtMoney(value)}`
   };
 }
 
+function optionAPoints(rent: number, nonRentSpendOnBilt: number): number {
+  if (rent <= 0) return 0;
+  const ratio = rent > 0 ? nonRentSpendOnBilt / rent : 0;
+  let tier = 0;
+
+  if (ratio >= 1.0) tier = 1.25;
+  else if (ratio >= 0.75) tier = 1.0;
+  else if (ratio >= 0.5) tier = 0.75;
+  else if (ratio >= 0.25) tier = 0.5;
+  else tier = 0;
+
+  const rawPoints = rent * tier;
+  return ratio < 0.25 ? 250 : rawPoints;
+}
+
+function optionBPoints(rent: number, nonRentSpendOnBilt: number): number {
+  const biltCash = nonRentSpendOnBilt * 0.04;
+  const unlockedPoints = biltCash / 0.03;
+  return Math.min(rent, unlockedPoints);
+}
 function buildBiltComparisonData(
   rent: number,
   maxAdditionalSpend: number,
@@ -249,6 +249,7 @@ function buildBiltComparisonData(
     const rentPointsA = optionAPoints(rent, additionalSpend);
     const rentPointsB = optionBPoints(rent, additionalSpend);
 
+    // include 1x points earned on the non-rent spend itself
     const totalPointsA = additionalSpend + rentPointsA;
     const totalPointsB = additionalSpend + rentPointsB;
 
@@ -264,7 +265,6 @@ function buildBiltComparisonData(
 
   return rows;
 }
-
 function valueForSpend(args: {
   card: Card;
   category: Category;
@@ -302,6 +302,7 @@ function valueForSpend(args: {
 
   const points = spend * mult;
   const value = points * (cppByProgram[card.program] ?? 0);
+
   return {
     value,
     earned: `${points.toLocaleString(undefined, { maximumFractionDigits: 0 })} pts`,
@@ -310,33 +311,28 @@ function valueForSpend(args: {
 }
 
 function evaluateAssignment(args: {
+  benefits: BenefitSettings;
   assignment: Record<Category, string>;
   selected: Record<string, Card>;
   spend: SpendState;
   cppByProgram: Record<Program, number>;
   rent: number;
   rentMode: RentMode;
-  tier25: number;
-  tier50: number;
-  tier75: number;
-  tier100: number;
-  biltCashRate: number;
-  unlockRate: number;
   hasPrime: boolean;
   wholeFoodsShare: number;
   useTravelPortal: boolean;
 }): Scenario {
-const {
-  assignment,
-  selected,
-  spend,
-  cppByProgram,
-  rent,
-  rentMode,
-  hasPrime,
-  wholeFoodsShare,
-  useTravelPortal,
-} = args;
+  const {
+    assignment,
+    selected,
+    spend,
+    cppByProgram,
+    rent,
+    rentMode,
+    hasPrime,
+    wholeFoodsShare,
+    useTravelPortal,
+  } = args;
 
   const usedCards = Array.from(new Set(Object.values(assignment))).sort();
   let coreValue = 0;
@@ -344,14 +340,10 @@ const {
 
   const rows: ScenarioRow[] = CATEGORIES.map((category) => {
     const cardName = assignment[category];
-    const card = selected[cardName];
-
-    if (!card) {
-      throw new Error(`Card not found for assignment: ${cardName}`);
-    }
+    const card = selected[cardName]!;
 
     const result = valueForSpend({
-      card: card!,
+      card,
       category,
       spend: spend[category],
       cppByProgram,
@@ -407,34 +399,21 @@ const {
       unlockRate: BILT_UNLOCK_RATE,
     });
 
-    if (rentMode === "auto") {
-      if (a.value >= b.value) {
-        rentValue = a.value;
-        rentExplain = a.explain;
-        rentModeUsed = "Option A";
-      } else {
-        rentValue = b.value;
-        rentExplain = b.explain;
-        rentModeUsed = "Option B";
-      }
-    } else if (rentMode === "option_a") {
-      rentValue = a.value;
-      rentExplain = a.explain;
-      rentModeUsed = "Option A";
-    } else {
-      rentValue = b.value;
-      rentExplain = b.explain;
-      rentModeUsed = "Option B";
-    }
+    const result = benefitValues(args.benefits, rentMode, a.value, b.value, usedCards);
+    rentValue = result.housing;
+    rentModeUsed = result.label;
+    rentExplain = `${result.label}; equal monthly spending and housing payments.`;
   }
 
+  const creditValue = benefitValues(args.benefits, rentMode, 0, 0, usedCards).credit;
   return {
+    creditValue,
     assignment,
     usedCards,
     coreValue,
     rentValue,
     fees,
-    totalValue: coreValue + rentValue - fees,
+    totalValue: coreValue + rentValue + creditValue - fees,
     rentModeUsed,
     rentExplain,
     nonRentSpendOnBilt,
@@ -443,17 +422,12 @@ const {
 }
 
 function bestCombos(args: {
+  benefits: BenefitSettings;
   selectedCards: Record<string, Card>;
   spend: SpendState;
   cppByProgram: Record<Program, number>;
   rent: number;
   rentMode: RentMode;
-  tier25: number;
-  tier50: number;
-  tier75: number;
-  tier100: number;
-  biltCashRate: number;
-  unlockRate: number;
   hasPrime: boolean;
   wholeFoodsShare: number;
   useTravelPortal: boolean;
@@ -463,10 +437,11 @@ function bestCombos(args: {
   const names = Object.keys(args.selectedCards);
   const raw: Scenario[] = [];
 
-  for (let k = 1; k <= Math.min(args.maxCardsAllowed, names.length); k++) {
+  for (let k = 1; k <= Math.min(args.maxCardsAllowed, names.length); k += 1) {
     const subsets = kCombinations(names, k);
 
     for (const chosen of subsets) {
+      if (chosen.filter((name) => BILT_NAMES.has(name)).length > 1) continue;
       for (const d of chosen) {
         for (const g of chosen) {
           for (const f of chosen) {
@@ -482,18 +457,13 @@ function bestCombos(args: {
 
                 raw.push(
                   evaluateAssignment({
+                    benefits: args.benefits,
                     assignment,
                     selected: args.selectedCards,
                     spend: args.spend,
                     cppByProgram: args.cppByProgram,
                     rent: args.rent,
                     rentMode: args.rentMode,
-                    tier25: args.tier25,
-                    tier50: args.tier50,
-                    tier75: args.tier75,
-                    tier100: args.tier100,
-                    biltCashRate: args.biltCashRate,
-                    unlockRate: args.unlockRate,
                     hasPrime: args.hasPrime,
                     wholeFoodsShare: args.wholeFoodsShare,
                     useTravelPortal: args.useTravelPortal,
@@ -515,61 +485,38 @@ function bestCombos(args: {
   const bestByCardSet = new Map<string, Scenario>();
 
   for (const r of raw) {
-    const cardSetKey = r.usedCards.join(" | ");
-    const existing = bestByCardSet.get(cardSetKey);
-
+    const key = r.usedCards.join(" | ");
+    const existing = bestByCardSet.get(key);
     if (!existing || r.totalValue > existing.totalValue) {
-      bestByCardSet.set(cardSetKey, r);
+      bestByCardSet.set(key, r);
     }
   }
 
-  const deduped = Array.from(bestByCardSet.values());
-
-  deduped.sort((a, b) => {
-    if (b.totalValue !== a.totalValue) return b.totalValue - a.totalValue;
-    return a.usedCards.length - b.usedCards.length;
-  });
-
-  return deduped.slice(0, args.topK);
+  return Array.from(bestByCardSet.values())
+    .sort((a, b) => {
+      if (b.totalValue !== a.totalValue) return b.totalValue - a.totalValue;
+      return a.usedCards.length - b.usedCards.length;
+    })
+    .slice(0, args.topK);
 }
 
 function buildSingleCardScenario(args: {
+  benefits: BenefitSettings;
   card: Card;
   spend: SpendState;
   rent: number;
   rentMode: RentMode;
   cppByProgram: Record<Program, number>;
-  tier25: number;
-  tier50: number;
-  tier75: number;
-  tier100: number;
-  biltCashRate: number;
-  unlockRate: number;
   hasPrime: boolean;
   wholeFoodsShare: number;
   useTravelPortal: boolean;
 }): SingleCardScenario {
-  const {
-    card,
-    spend,
-    rent,
-    rentMode,
-    cppByProgram,
-    tier25,
-    tier50,
-    tier75,
-    tier100,
-    biltCashRate,
-    unlockRate,
-    hasPrime,
-    wholeFoodsShare,
-    useTravelPortal,
-  } = args;
+  const { card, spend, rent, rentMode, cppByProgram, hasPrime, wholeFoodsShare, useTravelPortal } = args;
 
   let coreValue = 0;
   let nonRentSpendOnBilt = 0;
 
-  const rows = CATEGORIES.map((category) => {
+  const rows: SingleCardScenario["rows"] = CATEGORIES.map((category) => {
     const result = valueForSpend({
       card,
       category,
@@ -604,55 +551,44 @@ function buildSingleCardScenario(args: {
       nonRentSpendOnBilt,
       biltCpp: cppByProgram.bilt,
       mode: "option_a",
-      tier25,
-      tier50,
-      tier75,
-      tier100,
-      biltCashRate,
-      unlockRate,
+      tier25: BILT_TIER_25,
+      tier50: BILT_TIER_50,
+      tier75: BILT_TIER_75,
+      tier100: BILT_TIER_100,
+      biltCashRate: BILT_CASH_RATE,
+      unlockRate: BILT_UNLOCK_RATE,
     });
+
     const b = biltRentValue({
       rent,
       nonRentSpendOnBilt,
       biltCpp: cppByProgram.bilt,
       mode: "option_b",
-      tier25,
-      tier50,
-      tier75,
-      tier100,
-      biltCashRate,
-      unlockRate,
+      tier25: BILT_TIER_25,
+      tier50: BILT_TIER_50,
+      tier75: BILT_TIER_75,
+      tier100: BILT_TIER_100,
+      biltCashRate: BILT_CASH_RATE,
+      unlockRate: BILT_UNLOCK_RATE,
     });
 
     rentA = a.value;
     rentB = b.value;
 
-    if (rentMode === "auto") {
-      if (a.value >= b.value) {
-        usedRent = a.value;
-        usedLabel = "Option A";
-        explain = a.explain;
-      } else {
-        usedRent = b.value;
-        usedLabel = "Option B";
-        explain = b.explain;
-      }
-    } else if (rentMode === "option_a") {
-      usedRent = a.value;
-      usedLabel = "Option A";
-      explain = a.explain;
-    } else {
-      usedRent = b.value;
-      usedLabel = "Option B";
-      explain = b.explain;
-    }
+    const result = benefitValues(args.benefits, rentMode, a.value, b.value, [card.name]);
+    usedRent = result.housing;
+    usedLabel = result.label;
+    explain = `${result.label}; equal monthly spending and housing payments.`;
   }
 
   const fee = card.annualFee;
-  const net = coreValue + usedRent - fee;
+  const creditValue = benefitValues(args.benefits, rentMode, 0, 0, [card.name]).credit;
+  const net = coreValue + usedRent + creditValue - fee;
+  rows.push({ category: "Usable credits", spend: "—", rate: "User valuation", earned: "—", value: fmtMoney(creditValue) });
 
   return {
     rows,
+    creditValue,
     coreValue,
     rentA,
     rentB,
@@ -713,12 +649,16 @@ function TabButton(props: { active: boolean; children: ReactNode; onClick: () =>
 }
 
 export default function CardOptimizerPage() {
-  // draft state
+  const [activeTab, setActiveTab] = useState<TabKey>("optimizer");
+
   const [draftSelectedNames, setDraftSelectedNames] = useState<string[]>([]);
   const [draftSpend, setDraftSpend] = useState<SpendState>(EMPTY_SPEND);
   const [draftRent, setDraftRent] = useState(0);
   const [draftMaxCardsAllowed, setDraftMaxCardsAllowed] = useState(3);
-  const [draftRentMode, setDraftRentMode] = useState<RentMode>("auto");
+  const [draftRentMode, setDraftRentMode] = useState<RentMode>("option_a");
+  const [eligibility, setEligibility] = useState("refreshed");
+  const [draftBenefits, setDraftBenefits] = useState(DEFAULT_BENEFITS);
+  const [benefits, setBenefits] = useState(DEFAULT_BENEFITS);
   const [draftHasPrime, setDraftHasPrime] = useState(true);
   const [draftWholeFoodsShare, setDraftWholeFoodsShare] = useState(0.25);
   const [draftUseTravelPortal, setDraftUseTravelPortal] = useState(false);
@@ -728,12 +668,11 @@ export default function CardOptimizerPage() {
   const [draftChaseCpp, setDraftChaseCpp] = useState(1.25);
   const [draftCitiCpp, setDraftCitiCpp] = useState(1.1);
 
-  // committed state
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
   const [spend, setSpend] = useState<SpendState>(EMPTY_SPEND);
   const [rent, setRent] = useState(0);
   const [maxCardsAllowed, setMaxCardsAllowed] = useState(3);
-  const [rentMode, setRentMode] = useState<RentMode>("auto");
+  const [rentMode, setRentMode] = useState<RentMode>("option_a");
   const [hasPrime, setHasPrime] = useState(true);
   const [wholeFoodsShare, setWholeFoodsShare] = useState(0.25);
   const [useTravelPortal, setUseTravelPortal] = useState(false);
@@ -743,22 +682,14 @@ export default function CardOptimizerPage() {
   const [chaseCpp, setChaseCpp] = useState(1.25);
   const [citiCpp, setCitiCpp] = useState(1.1);
 
-  // fixed assumptions
-  const tier25 = 0.5;
-  const tier50 = 0.75;
-  const tier75 = 1.0;
-  const tier100 = 1.25;
-  const biltCashRate = 0.04;
-  const unlockRate = 0.03;
-
   const [cardA, setCardA] = useState("");
   const [cardB, setCardB] = useState("");
 
-  const [activeTab, setActiveTab] = useState<TabKey>("optimizer");
   const [biltMonthlyRent, setBiltMonthlyRent] = useState(0);
   const [biltMonthlyRentTouched, setBiltMonthlyRentTouched] = useState(false);
 
   function applyChanges() {
+    setBenefits({ ...draftBenefits, period: eligibility });
     setSelectedNames([...draftSelectedNames]);
     setSpend(cloneSpend(draftSpend));
     setRent(draftRent);
@@ -775,11 +706,14 @@ export default function CardOptimizerPage() {
   }
 
   function clearAll() {
+    setDraftBenefits(DEFAULT_BENEFITS);
+    setBenefits(DEFAULT_BENEFITS);
     setDraftSelectedNames([]);
     setDraftSpend(cloneSpend(EMPTY_SPEND));
     setDraftRent(0);
     setDraftMaxCardsAllowed(3);
-    setDraftRentMode("auto");
+    setDraftRentMode("option_a");
+    setEligibility("refreshed");
     setDraftHasPrime(true);
     setDraftWholeFoodsShare(0.25);
     setDraftUseTravelPortal(false);
@@ -793,7 +727,7 @@ export default function CardOptimizerPage() {
     setSpend(cloneSpend(EMPTY_SPEND));
     setRent(0);
     setMaxCardsAllowed(3);
-    setRentMode("auto");
+    setRentMode("option_a");
     setHasPrime(true);
     setWholeFoodsShare(0.25);
     setUseTravelPortal(false);
@@ -805,6 +739,9 @@ export default function CardOptimizerPage() {
 
     setCardA("");
     setCardB("");
+
+    setBiltMonthlyRent(0);
+    setBiltMonthlyRentTouched(false);
   }
 
   const selectedCards = useMemo(() => {
@@ -824,38 +761,26 @@ export default function CardOptimizerPage() {
     }),
     [biltCpp, cap1Cpp, amexCpp, chaseCpp, citiCpp]
   );
+  const derivedMonthlyRent = useMemo(() => {
+  return rent > 0 ? rent / 12 : 0;
+}, [rent]);
 
   const scenarios = useMemo(() => {
     if (!Object.keys(selectedCards).length) return [];
     return bestCombos({
+      benefits,
       selectedCards,
       spend,
       cppByProgram,
       rent,
       rentMode,
-      tier25,
-      tier50,
-      tier75,
-      tier100,
-      biltCashRate,
-      unlockRate,
       hasPrime,
       wholeFoodsShare,
       useTravelPortal,
       maxCardsAllowed,
       topK: 10,
     });
-  }, [
-    selectedCards,
-    spend,
-    cppByProgram,
-    rent,
-    rentMode,
-    hasPrime,
-    wholeFoodsShare,
-    useTravelPortal,
-    maxCardsAllowed,
-  ]);
+  }, [benefits, selectedCards, spend, cppByProgram, rent, rentMode, hasPrime, wholeFoodsShare, useTravelPortal, maxCardsAllowed]);
 
   const best = scenarios[0] ?? null;
 
@@ -873,90 +798,52 @@ export default function CardOptimizerPage() {
       return;
     }
 
-    const firstCard = comparatorChoices[0];
-    const secondCard =
-      comparatorChoices.length > 1 ? comparatorChoices[1] : comparatorChoices[0];
-
-    if (firstCard && !comparatorChoices.includes(cardA)) {
-      setCardA(firstCard);
+    if (!comparatorChoices.includes(cardA)) {
+      setCardA(comparatorChoices[0] ?? "");
     }
 
-    if (secondCard && !comparatorChoices.includes(cardB)) {
-      setCardB(secondCard);
+    if (!comparatorChoices.includes(cardB)) {
+      setCardB(comparatorChoices[Math.min(1, comparatorChoices.length - 1)] ?? "");
     }
   }, [comparatorChoices, cardA, cardB]);
-
-  const scenarioA = useMemo(() => {
-    const card = selectedCards[cardA];
-    if (!card) return null;
-    return buildSingleCardScenario({
-      card,
-      spend,
-      rent,
-      rentMode,
-      cppByProgram,
-      tier25: BILT_TIER_25,
-      tier50: BILT_TIER_50,
-      tier75: BILT_TIER_75,
-      tier100: BILT_TIER_100,
-      biltCashRate: BILT_CASH_RATE,
-      unlockRate: BILT_UNLOCK_RATE,
-      hasPrime,
-      wholeFoodsShare,
-      useTravelPortal,
-    });
-  }, [
-    cardA,
-    selectedCards,
-    spend,
-    rent,
-    rentMode,
-    cppByProgram,
-    hasPrime,
-    wholeFoodsShare,
-    useTravelPortal,
-  ]);
-
-  const scenarioB = useMemo(() => {
-    const card = selectedCards[cardB];
-    if (!card) return null;
-    return buildSingleCardScenario({
-      card,
-      spend,
-      rent,
-      rentMode,
-      cppByProgram,
-      tier25: BILT_TIER_25,
-      tier50: BILT_TIER_50,
-      tier75: BILT_TIER_75,
-      tier100: BILT_TIER_100,
-      biltCashRate: BILT_CASH_RATE,
-      unlockRate: BILT_UNLOCK_RATE,
-      hasPrime,
-      wholeFoodsShare,
-      useTravelPortal,
-    });
-  }, [
-    cardB,
-    selectedCards,
-    spend,
-    rent,
-    rentMode,
-    cppByProgram,
-    hasPrime,
-    wholeFoodsShare,
-    useTravelPortal,
-  ]);
-
-  const derivedMonthlyRent = useMemo(() => {
-  return rent > 0 ? Math.round(rent / 12) : 0;
-}, [rent]);
 
   useEffect(() => {
   if (!biltMonthlyRentTouched) {
     setBiltMonthlyRent(derivedMonthlyRent);
   }
 }, [derivedMonthlyRent, biltMonthlyRentTouched]);
+
+  const scenarioA = useMemo(() => {
+    const card = selectedCards[cardA];
+    if (!card) return null;
+    return buildSingleCardScenario({
+      benefits,
+      card,
+      spend,
+      rent,
+      rentMode,
+      cppByProgram,
+      hasPrime,
+      wholeFoodsShare,
+      useTravelPortal,
+    });
+  }, [benefits, cardA, selectedCards, spend, rent, rentMode, cppByProgram, hasPrime, wholeFoodsShare, useTravelPortal]);
+
+  const scenarioB = useMemo(() => {
+    const card = selectedCards[cardB];
+    if (!card) return null;
+    return buildSingleCardScenario({
+      benefits,
+      card,
+      spend,
+      rent,
+      rentMode,
+      cppByProgram,
+      hasPrime,
+      wholeFoodsShare,
+      useTravelPortal,
+    });
+  }, [benefits, cardB, selectedCards, spend, rent, rentMode, cppByProgram, hasPrime, wholeFoodsShare, useTravelPortal]);
 
 const biltDeepDiveRaw = useMemo(() => {
   const maxX = biltMonthlyRent > 0 ? Math.ceil((biltMonthlyRent * 2) / 100) * 100 : 5000;
@@ -966,7 +853,7 @@ const biltDeepDiveRaw = useMemo(() => {
 }, [biltMonthlyRent]);
 
 const biltDeepDiveData = useMemo(() => {
-  const effectiveRent = biltMonthlyRent > 0 ? biltMonthlyRent : 5000;
+  const effectiveRent = Math.max(0, biltMonthlyRent);
   const maxX = Math.ceil((effectiveRent * 2) / 100) * 100;
   const step = 100;
 
@@ -979,7 +866,7 @@ const biltDeepDiveData = useMemo(() => {
   }));
 }, [biltMonthlyRent]);
 
-const breakpoint = useMemo(() => {
+  const breakpoint = useMemo(() => {
   let seenBAboveA = false;
 
   for (const d of biltDeepDiveRaw) {
@@ -1003,26 +890,6 @@ const maxOptionBLead = useMemo(() => {
   }
   return best;
 }, [biltDeepDiveRaw]);
-
-function tooltipValueToNumber(value: unknown): number {
-  if (typeof value === "number") return value;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-}
-
-function tooltipLabelToMoney(label: unknown): string {
-  if (typeof label === "number") return `Additional spend: ${fmtMoney(label)}`;
-  if (typeof label === "string") {
-    const parsed = Number(label);
-    return Number.isFinite(parsed)
-      ? `Additional spend: ${fmtMoney(parsed)}`
-      : `Additional spend: ${label}`;
-  }
-  return "Additional spend";
-}
 
   return (
   <main className="min-h-screen bg-white text-zinc-900">
@@ -1225,19 +1092,47 @@ function tooltipLabelToMoney(label: unknown): string {
                         value={draftRentMode}
                         onChange={(e) => setDraftRentMode(e.target.value as RentMode)}
                       >
-                        <option value="auto">Auto</option>
-                        <option value="option_a">Option A</option>
-                        <option value="option_b">Option B</option>
+
+                        <option value="option_a" disabled={eligibility === "legacy"}>Housing-only (A)</option>
+                        <option value="option_b" disabled={eligibility === "refreshed"}>Flexible Bilt Cash (B)</option>
                       </select>
                     </label>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-zinc-200 p-4">
-                  <h3 className="mb-3 font-medium">Bilt assumptions</h3>
+                  <h3 className="mb-3 font-medium">Bilt assumptions</h3>                  <label className="grid gap-2 mb-3 text-sm">Cardholder benefit period
+                    <select className="bg-zinc-50 border border-zinc-200 rounded-xl p-2" value={eligibility} onChange={(event) => {
+                      const next = event.target.value;
+                      setEligibility(next);
+                      setDraftRentMode(next === "legacy" ? "option_b" : "option_a");
+                    }}>
+                      <option value="refreshed">New 2027 account / refreshed benefits</option>
+                      <option value="transition">2027 transition year: legacy then refreshed</option>
+                      <option value="legacy">Pre-2027 account with timely Flexible opt-out</option>
+                    </select>
+                  </label>
+                  {eligibility === "transition" && <label className="grid gap-2 text-sm mb-3">Complete billing cycles before anniversary (0–12)
+                    <input type="number" min={0} max={12} value={draftBenefits.legacyCycles} className="bg-zinc-50 border border-zinc-200 rounded-xl p-2" onChange={(event) => setDraftBenefits({ ...draftBenefits, legacyCycles: Math.max(0, Math.min(12, Math.floor(Number(event.target.value) || 0))) })} />
+                    <span className="text-xs text-zinc-500">Selected mode before transition; Housing-only afterward. Equal monthly spend and rent. Assign the anniversary cycle according to your statement.</span>
+                  </label>}
+                  <div className="space-y-3 mb-3">
+                    <div className="text-sm font-medium">Usable credit value ($ for modeled year)</div>
+                    <p className="text-xs text-zinc-500">Enter expected savings after restrictions and expiration. Refreshed credits replace old credits and arrive on the anniversary. Transition entries are actual usable amounts from each period, not prorated allowances. Exclude overlapping benefits and cash used for housing points. Defaults to $0.</p>
+                    {([
+                      ["obsidianValue", "Refreshed Obsidian Bilt Cash", 100, "refreshed"],
+                      ["palladiumValue", "Refreshed Palladium Bilt Cash", 600, "refreshed"],
+                      ["legacyObsidianValue", "Legacy Obsidian eligible credits", 100, "legacy"],
+                      ["legacyPalladiumValue", "Legacy Palladium eligible credits", 600, "legacy"],
+                    ] as const).filter(([, , , period]) => eligibility === "transition" || eligibility === period).map(([key, label, cap]) => <label key={key} className="grid gap-1 text-sm">
+                      {label} (up to ${cap})
+                      <input type="number" min={0} max={cap} value={draftBenefits[key]} className="bg-zinc-50 border border-zinc-200 rounded-xl p-2" onChange={(event) => setDraftBenefits({ ...draftBenefits, [key]: Math.max(0, Math.min(cap, Number(event.target.value) || 0)) })} />
+                    </label>)}
+                  </div>
+
                   <div className="space-y-2 text-sm text-zinc-500">
                     <div>Option A tiers: 25% → 0.50×, 50% → 0.75×, 75% → 1.00×, 100% → 1.25×</div>
-                    <div>Option B: 4% rent cap, 3% unlock rate</div>
+                    <div>Flexible: 4% Bilt Cash on everyday spend; $30 unlocks 1,000 housing points, capped at 1× housing</div>
                     <div className="text-zinc-500">Shown for transparency only.</div>
                   </div>
                 </div>
@@ -1283,7 +1178,7 @@ function tooltipLabelToMoney(label: unknown): string {
                       Best combo: {best.usedCards.join(", ")} — {fmtMoney(best.totalValue)}/yr
                     </div>
                     <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-                      Net annual value = value from category spend + modeled Bilt rent value − annual fees.
+                      Net annual value = value from category spend + modeled Bilt rent value + usable credits − annual fees.
                       Point cards are converted to dollars using your cpp assumptions. Cashback cards are treated as direct dollar value.
                     </div>
                   </div>
@@ -1319,6 +1214,9 @@ function tooltipLabelToMoney(label: unknown): string {
                             Rate: best.rentValue > 0 ? best.rentModeUsed : "—",
                             Earned: "—",
                             "Value ($)": fmtMoney(best.rentValue),
+                          },
+                          {
+                            Category: "Usable credits", Spend: "—", Card: "—", Program: "Bilt", Rate: "User valuation", Earned: "—", "Value ($)": fmtMoney(best.creditValue),
                           },
                           {
                             Category: "Fees",
@@ -1590,7 +1488,7 @@ function tooltipLabelToMoney(label: unknown): string {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-soft">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -1611,7 +1509,7 @@ function tooltipLabelToMoney(label: unknown): string {
                   value={biltMonthlyRent}
                   onChange={(e) => {
                     setBiltMonthlyRentTouched(true);
-                    setBiltMonthlyRent(Number(e.target.value) || 0);
+                    setBiltMonthlyRent(Math.max(0, Number(e.target.value) || 0));
                   }}
                 />
               </div>
@@ -1642,6 +1540,10 @@ function tooltipLabelToMoney(label: unknown): string {
               <div className="mt-2 text-3xl font-semibold">
                 {breakpoint ? fmtMoney(breakpoint.additionalSpend) : "No crossover"}
               </div>
+            </div>
+            <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-soft">
+              <div className="text-sm text-zinc-500">First sampled Flexible lead (monthly spend)</div>
+              <div className="mt-2 text-2xl font-semibold">{firstOptionBLead ? fmtMoney(firstOptionBLead.additionalSpend) : "None"}</div>
             </div>
           </div>
 
@@ -1680,13 +1582,13 @@ function tooltipLabelToMoney(label: unknown): string {
                       color: "#18181b",
                     }}
                     formatter={(value, name) => {
-                      const num = tooltipValueToNumber(value);
+                      const num = Number(value);
                       const label =
-                        name === "optionAMultiplier" ? "Option A multiplier" : "Option B multiplier";
+                        String(name);
 
                       return [`${num.toFixed(2)}x`, label];
                     }}
-                    labelFormatter={(label) => tooltipLabelToMoney(label)}
+                    labelFormatter={(label) => `Monthly spend: ${fmtMoney(Number(label))}`}
                   />
                     <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: 8 }} />
                     <ReferenceLine y={1} stroke="#a1a1aa" strokeDasharray="4 4" />
@@ -1730,12 +1632,12 @@ function tooltipLabelToMoney(label: unknown): string {
                         color: "#18181b",
                       }}
                       formatter={(value, name) => {
-                        const num = tooltipValueToNumber(value);
-                        const label = name === "optionA" ? "Option A points" : "Option B points";
+                        const num = Number(value);
+                        const label = String(name);
 
                         return [`${fmtPoints(num)} pts`, label];
                       }}
-                      labelFormatter={(label) => tooltipLabelToMoney(label)}
+                      labelFormatter={(label) => `Monthly spend: ${fmtMoney(Number(label))}`}
                     />
                     <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: 8 }} />
                     {breakpoint ? (
@@ -1812,7 +1714,7 @@ function tooltipLabelToMoney(label: unknown): string {
             <h3 className="text-xl font-semibold">Assumptions</h3>
             <div className="mt-4 space-y-2 text-sm text-zinc-500">
               <div>Option A tiers: 25% → 0.50×, 50% → 0.75×, 75% → 1.00×, 100% → 1.25×</div>
-              <div>Option B: 4% rent cap, 3% unlock rate</div>
+              <div>Flexible: 4% Bilt Cash on everyday spend; $30 unlocks 1,000 housing points, capped at 1× housing</div>
               <div>
                 This tab is explanatory. The optimizer tab is what determines whether routing extra spend to Bilt is actually
                 worth it versus Venture X, Amex Gold, or other cards.
